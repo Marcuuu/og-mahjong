@@ -1,0 +1,8 @@
+.DS_Store
+html/.sass-cache/
+new-html/.sass-cache/
+*.css.map
+node_modules/
+error.log
+error_log
+.env
