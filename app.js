@@ -17,25 +17,7 @@ for (let i = 0; i < 6; i++) {
   days.push(moment().add(i, 'days').format('dddd'));
 }
 
-fetch(`https://api.telegram.org/bot${process.env.TOKEN}/getUpdates`, {
-  method: 'GET',
-  credentials: 'include',
-})
-  .then(resp => resp.json())
-  .then(data => {
-    console.log(data)
-  })
-
-bot.onText(/\/start/, msg => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(
-    chatId,
-    `Marc test start.`
-  );
-});
-
-bot.onText(/\/play/, (msg, match) => {
-  console.log(match)
+bot.onText(/\/play/, msg => {
   const chatId = msg.chat.id;
   const name = msg.from.first_name;
   bot.sendMessage(
@@ -80,10 +62,44 @@ bot.onText(/\/play/, (msg, match) => {
   )
 });
 
+bot.onText(/\/status/, msg => {
+  const chatId = msg.chat.id;
+  let text = '';
+  scheduled.forEach((el, i) => {
+    const players = el.players.join(', ');
+    text += `${i + 1} - ${el.date}, ${el.time}
+      Players: ${players}
+`
+  });
+  bot.sendMessage(
+    chatId,
+    text
+  );
+});
+
+bot.onText(/\/join/, msg => {
+  const chatId = msg.chat.id;
+  let buttons = [];
+  scheduled.forEach((el, i) => {
+    const players = el.players.join(', ')
+    buttons.push([{
+      text: `${i + 1} - ${el.date}, ${el.time}
+        Players: ${players}`,
+      callback_data: `join/${el._id}`,
+    }]);
+  });
+  bot.sendMessage(chatId, `Select a session to join.`, {
+    reply_markup: {
+      inline_keyboard: buttons,
+    },
+  });
+});
+
 let hours = '00';
 let minutes = '00';
 let date;
 let day;
+const scheduled = [];
 
 bot.on('callback_query', (callbackQuery) => {
   const chatId = callbackQuery.message.chat.id;
@@ -91,11 +107,21 @@ bot.on('callback_query', (callbackQuery) => {
   const name = callbackQuery.from.first_name;
   const data = callbackQuery.data.split('/');
   const option = data[0];
-  if (data[1]) {
+  if (data[1] && option.search('day') >= 0) {
+    console.log('setting day');
     day = data[1];
   }
-  if (data[2]) {
+  if (data[2] && option.search('day') >= 0) {
+    console.log('setting date');
     date = data[2];
+    scheduled.push(
+      {
+        _id: messageId,
+        start: name,
+        date: `${date}, ${day}`,
+        players: [name]
+      }
+    );
   }
   switch(option) {
     case 'day1':
@@ -678,10 +704,44 @@ bot.on('callback_query', (callbackQuery) => {
           message_id: messageId
         }
       );
+      scheduled.forEach(el => {
+        if (el.start === name) {
+          el.time = `${hours}:${minutes}`
+        }
+      });
       bot.sendMessage(
         chatId,
         `Who else want to play with ${name} on the ${date}, ${day} at ${hours}:${minutes}?`
-      )
+      );
+      break;
+    case 'join':
+      const joinId = parseInt(callbackQuery.data.split('/')[1]);
+      scheduled.forEach(el => {
+        if (el._id === joinId) {
+          el.players.push(name);
+        }
+      });
+      let text = '';
+      scheduled.forEach((el, i) => {
+        const players = el.players.join(', ')
+        text += `${i + 1} - ${el.date}, ${el.time}
+      Players: ${players}
+`
+      });
+      bot.editMessageReplyMarkup(
+        {
+          inline_keyboard: [],
+        },
+        {
+          chat_id: chatId,
+          message_id: messageId,
+        }
+      );
+      bot.sendMessage(
+        chatId,
+        text
+      );
+      break;
   }
 });
 
