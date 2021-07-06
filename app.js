@@ -1,13 +1,16 @@
 require('dotenv').config();
+const { Composer } = require('micro-bot');
 const TelegramBot = require('node-telegram-bot-api');
 const moment = require('moment');
 const fetch = require('node-fetch');
 
 const token = process.env.TOKEN;
 
-const bot = new TelegramBot(token, {
-  polling: true
-});
+// const bot = new TelegramBot(token, {
+//   polling: true
+// });
+
+const bot = new Composer;
 
 const dates = [];
 const days = [];
@@ -79,9 +82,9 @@ bot.onText(/\/status/, msg => {
 
 bot.onText(/\/join/, msg => {
   const chatId = msg.chat.id;
-  let buttons = [];
+  const buttons = [];
   scheduled.forEach((el, i) => {
-    const players = el.players.join(', ')
+    const players = el.players.join(', ');
     buttons.push([{
       text: `${i + 1} - ${el.date}, ${el.time}
         Players: ${players}`,
@@ -92,6 +95,24 @@ bot.onText(/\/join/, msg => {
     reply_markup: {
       inline_keyboard: buttons,
     },
+  });
+});
+
+bot.onText(/\/remove/, msg => {
+  const chatId = msg.chat.id;
+  const buttons = [];
+  scheduled.forEach((el, i) => {
+    const players = el.players.join(', ');
+    buttons.push([{
+      text: `${i + 1} - ${el.date}, ${el.time}
+        Players: ${players}`,
+      callback_data: `remove/${el._id}`
+    }]);
+  });
+  bot.sendMessage(chatId, `Select a session to remove.`, {
+    reply_markup: {
+      inline_keyboard: buttons
+    }
   });
 });
 
@@ -742,9 +763,33 @@ bot.on('callback_query', (callbackQuery) => {
         text
       );
       break;
+    case 'remove':
+      const removeId = parseInt(callbackQuery.data.split('/')[1]);
+      scheduled.forEach((el, i) => {
+        const obj = scheduled[i];
+        if (scheduled.indexOf(obj._id) !== -1) {
+          scheduled.splice(i, 1);
+        }
+      });
+      bot.editMessageReplyMarkup(
+        {
+          inline_keyboard: []
+        },
+        {
+          chat_id: chatId,
+          message_id: messageId
+        }
+      );
+      bot.sendMessage(
+        chatId,
+        `Session has been removed.`
+      );
+      break;
   }
 });
 
 bot.on('polling_error', (err) => {
   console.log(err);
 });
+
+modules.exports = bot;
